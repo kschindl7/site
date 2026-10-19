@@ -47,7 +47,18 @@ export const PROPS = {
   books: { file: FURN_DIR + 'book_set.gltf' },
   armchair: { file: FURN_DIR + 'armchair.gltf' },
   rug: { file: FURN_DIR + 'rug_rectangle_stripes_A.gltf' },
-  painting: { file: FURN_DIR + 'pictureframe_large_A.gltf' }
+  painting: { file: FURN_DIR + 'pictureframe_large_A.gltf' },
+  // Upstairs.
+  stairs: { file: PROP_DIR + 'stairs_wood.glb' },
+  trunk: { file: PROP_DIR + 'trunk_large_A.glb' },
+  trunkSmall: { file: PROP_DIR + 'trunk_medium_A.glb' },
+  bedDouble: { file: FURN_DIR + 'bed_double_A.gltf' },
+  bedSingle: { file: FURN_DIR + 'bed_single_A.gltf' },
+  bedSingleAlt: { file: FURN_DIR + 'bed_single_B.gltf' },
+  wardrobe: { file: FURN_DIR + 'cabinet_medium_decorated.gltf' },
+  rugOval: { file: FURN_DIR + 'rug_oval_A.gltf' },
+  rugPlain: { file: FURN_DIR + 'rug_rectangle_A.gltf' },
+  chairWood: { file: FURN_DIR + 'chair_A_wood.gltf' }
 };
 
 // Rigged characters. `clips` maps what the scene asks for (idle, walk, sit)

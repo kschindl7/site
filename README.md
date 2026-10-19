@@ -42,4 +42,5 @@ It lives at `/3d/` and leaves the pixel-art version untouched.
 - Walk with WASD or the arrow keys, drag to look around, scroll or pinch to zoom, and press E or Space to talk. On phones, tap to walk or talk.
 - Section text is read from this repo's `index.html`, so both versions stay in sync. Sound reuses `js/audio.js`.
 - Models are free CC0 KayKit packs. See `3d/assets/CREDITS.md`, and `3d/js/manifest.js` for swapping in other art.
-- `3d/js/world.js`: room, fireplace, quest board, lighting, rain. `3d/js/cast.js`: characters and banter. `3d/js/main.js`: camera, controls, dialog, menus.
+- Stairs along the north wall lead to a second floor with a hallway, two small bedrooms, and a large bedroom with a canopy bed. The upstairs only shows while you're on it.
+- `3d/js/world.js`: taproom, fireplace, quest board, lighting, rain. `3d/js/upstairs.js`: stairs and bedrooms. `3d/js/cast.js`: characters and banter. `3d/js/main.js`: camera, controls, dialog, menus.

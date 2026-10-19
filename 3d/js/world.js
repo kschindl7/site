@@ -5,20 +5,31 @@
  * Coordinates: x runs west to east, z runs north to south, y is up. One unit
  * is roughly a third of a person's height. The room's inside walls sit at
  * x = +/-9.5 and z = +/-7.5. The bar is on the north wall, the fireplace on
- * the east wall, the door and quest board on the south wall.
+ * the east wall, the door and quest board on the south wall. Stairs along the
+ * north wall lead to the upstairs bedrooms (see upstairs.js), whose floor sits
+ * at y = UPPER_Y.
  */
 import * as THREE from 'three';
 import { prop } from './assets.js';
+import { buildUpstairs, STAIRS } from './upstairs.js';
 
 export const ROOM = { minX: -9.5, maxX: 9.5, minZ: -7.5, maxZ: 7.5 };
+export const UPPER_Y = 4.05;
 
-const colliders = [];
+// Floor-plan blockers for each floor: [ground, upstairs].
+const colliders = [[], []];
 const hotspots = [];
 const flickers = [];
 let scene;
 // Each wall and what hangs on it, so the wall nearest the camera can be hidden.
+// Upstairs walls live in their own groups inside `upper`.
 const sides = {};
+const sidesUp = {};
+let upper = null;
 let target = null;
+let floor = 0; // which floor the build helpers are adding to
+let upperShown = false;
+const fadeWalls = [];
 
 // ---------- Small helpers ----------
 function place(role, x, z, rot, y) {
@@ -29,18 +40,19 @@ function place(role, x, z, rot, y) {
   return obj;
 }
 
-// Places everything built inside fn on the named wall.
+// Places everything built inside fn on the named wall of the current floor.
 function onWall(name, fn) {
-  target = sides[name];
+  const prev = target;
+  target = floor ? sidesUp[name] : sides[name];
   fn();
-  target = null;
+  target = prev;
 }
 
 const SIDE_ROT = { north: 0, south: Math.PI, west: Math.PI / 2, east: -Math.PI / 2 };
 
 // Axis-aligned blocker on the floor plan.
 function block(x0, x1, z0, z1, tag) {
-  colliders.push({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1), tag: tag });
+  colliders[floor].push({ minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1), tag: tag });
 }
 function blockAt(x, z, w, d, tag) { block(x - w / 2, x + w / 2, z - d / 2, z + d / 2, tag); }
 
@@ -115,7 +127,7 @@ function woodTexture(base) {
 }
 
 function hotspot(h) {
-  hotspots.push(Object.assign({ radius: 0.8, reach: 1.8 }, h));
+  hotspots.push(Object.assign({ radius: 0.8, reach: 1.8, level: floor }, h));
 }
 
 // ---------- Room shell ----------
@@ -168,7 +180,7 @@ function buildShell() {
   hotspot({ id: 'door', kind: 'flavor', x: 4, z: 7.4, radius: 1.2 });
 
   // Wall torches.
-  [[-9.5, -5.5, 'west'], [-9.5, 5, 'west'], [9.5, -5.5, 'east'], [-1, 7.5, 'south'], [7.2, 7.5, 'south'], [6, -7.5, 'north']].forEach(function (p) {
+  [[-9.5, -5.5, 'west'], [-9.5, 5, 'west'], [9.5, -5.5, 'east'], [-1, 7.5, 'south'], [7.2, 7.5, 'south'], [2.0, -7.5, 'north']].forEach(function (p) {
     const rot = SIDE_ROT[p[2]];
     onWall(p[2], function () {
       place('torch', p[0], p[1], rot, 2.2);
@@ -209,12 +221,10 @@ function buildBar() {
   // Kegs and stock along the rest of the north wall.
   place('kegFancy', -0.4, -6.6, 0);
   place('barrel', 2.0, -6.8, 0);
-  place('crates', 8.3, -6.6, 0);
-  place('boxes', 6.3, -6.9, 0.3);
+  place('crates', 7.6, 6.5, Math.PI);
   blockAt(-0.4, -6.6, 1.9, 2.0, 'keg');
   blockAt(2.0, -6.8, 1.6, 1.6, 'barrel');
-  blockAt(8.3, -6.6, 2.4, 2.0, 'crates');
-  blockAt(6.3, -6.9, 1.5, 1.4, 'crates');
+  blockAt(7.6, 6.5, 2.4, 2.0, 'crates');
   hotspot({ id: 'barrel', kind: 'flavor', x: -0.4, z: -5.8, radius: 1.0 });
 
   // Bar stools.
@@ -335,7 +345,7 @@ function addFlame(x, y, z, size) {
   const g = glowSprite('#ffae55', size * 4);
   g.position.set(x, y, z);
   (target || scene).add(g);
-  flickers.push({ sprite: g, base: size * 4, phase: Math.random() * 10 });
+  flickers.push({ sprite: g, base: size * 4, phase: Math.random() * 10, level: floor });
 }
 
 // ---------- Quest board (Work) ----------
@@ -440,8 +450,10 @@ function buildTables() {
 }
 
 // ---------- Rain and lightning ----------
-// Rain stops at the top of the walls so a high camera never sees it over the room.
-const RAIN_TOP = 4.2;
+// Rain stops at the top of the visible walls so a high camera never sees it
+// over the room: the ground walls downstairs, the upstairs walls upstairs.
+const RAIN_TOP = 8.2;
+const RAIN_TOP_GROUND = 4.2;
 const rain = { lines: null, speed: 16, boxes: [] };
 const lightning = { next: 8, flashes: [], level: 0, light: null };
 
@@ -480,7 +492,7 @@ function updateWeather(dt, t, reduceMotion) {
     d.x += 2.2 * dt;
     if (d.y < 0) { d.y += RAIN_TOP; d.x -= RAIN_TOP * 0.14; }
     const k = i * 6;
-    if (!sides[d.side].visible) { pos.fill(-50, k, k + 6); return; }
+    if (!sides[d.side].visible || (!upperShown && d.y > RAIN_TOP_GROUND)) { pos.fill(-50, k, k + 6); return; }
     pos[k] = d.x; pos[k + 1] = d.y; pos[k + 2] = d.z;
     pos[k + 3] = d.x - 0.08; pos[k + 4] = d.y + 0.45; pos[k + 5] = d.z;
   });
@@ -506,7 +518,7 @@ function buildLights() {
   const moon = new THREE.DirectionalLight('#7f93d6', 0.35);
   moon.position.set(-12, 10, 3);
   scene.add(moon);
-  [[-5.5, 3.5, -4.6, 10], [0.5, 3.7, -1.6, 9]].forEach(function (p) {
+  [[-5.5, 3.3, -4.6, 10], [0.5, 3.4, -1.6, 9]].forEach(function (p) {
     const l = new THREE.PointLight('#ffc585', p[3], 13, 1.5);
     l.position.set(p[0], p[1], p[2]);
     scene.add(l);
@@ -518,8 +530,8 @@ function buildLights() {
     const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 0.45, 6), new THREE.MeshStandardMaterial({ color: '#ffcc80', emissive: '#ff9a40', emissiveIntensity: 1.4 }));
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.27, 0.2, 6), frameMat);
     cap.position.y = 0.33;
-    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.4, 4), frameMat);
-    chain.position.y = 1.15;
+    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4), frameMat);
+    chain.position.y = 0.58;
     lantern.add(cage, cap, chain);
     lantern.position.set(p[0], p[1], p[2]);
     scene.add(lantern);
@@ -537,7 +549,42 @@ export function build(s) {
   buildTables();
   buildWeather();
   buildLights();
+
+  upper = new THREE.Group();
+  upper.visible = false;
+  scene.add(upper);
+  ['north', 'south', 'west', 'east'].forEach(function (n) {
+    sidesUp[n] = new THREE.Group();
+    upper.add(sidesUp[n]);
+  });
+  floor = 1;
+  target = upper;
+  buildUpstairs({
+    THREE: THREE, scene: scene, upper: upper, place: place, box: box, mat: mat, dim: dim,
+    block: block, blockAt: blockAt, hotspot: hotspot, onWall: onWall, candleAt: candleAt,
+    woodTexture: woodTexture, canvasTexture: canvasTexture, flickers: flickers, fadeWalls: fadeWalls,
+    setTarget: function (t) { target = t; }, setFloor: function (f) { floor = f; }, UPPER_Y: UPPER_Y
+  });
+  target = null;
+  floor = 0;
   return { colliders: colliders, hotspots: hotspots, lightning: lightning };
+}
+
+// Shows the upstairs only while the player is up there, so it never hides
+// the ground floor.
+export function showUpper(on) {
+  upperShown = on;
+  upper.visible = on;
+}
+
+// Floor height under a point: the stair ramp, or the floor the walker is on.
+// Returns which floor they now count as being on.
+export function heightAt(x, z, level) {
+  if (x >= STAIRS.x0 && x <= STAIRS.x1 && z >= STAIRS.z0 && z <= STAIRS.z1) {
+    const y = UPPER_Y * Math.max(0, Math.min(1, (STAIRS.x1 - x) / (STAIRS.x1 - STAIRS.x0)));
+    return { y: y, level: y > UPPER_Y / 2 ? 1 : 0 };
+  }
+  return { y: level ? UPPER_Y : 0, level: level };
 }
 
 // Hides the wall between the camera and the room, like a dollhouse.
@@ -546,8 +593,34 @@ export function cutaway(cam) {
   sides.south.visible = cam.z < ROOM.maxZ + 0.1;
   sides.west.visible = cam.x > ROOM.minX - 0.1;
   sides.east.visible = cam.x < ROOM.maxX + 0.1;
+  ['north', 'south', 'west', 'east'].forEach(function (n) { sidesUp[n].visible = sides[n].visible; });
   // Hanging lanterns vanish when the camera swings right into them.
   lanterns.forEach(function (l) { l.visible = cam.distanceTo(l.position) > 2.2; });
+}
+
+// Upstairs inner walls turn see-through when they stand between the camera
+// and the player.
+export function fadeBetween(cam, p) {
+  fadeWalls.forEach(function (w) {
+    const hit = upperShown && segmentHitsBox(cam.x, cam.z, p.x, p.z, w.box);
+    const goal = hit ? 0.18 : 1;
+    w.material.opacity += (goal - w.material.opacity) * 0.2;
+    w.material.depthWrite = w.material.opacity > 0.9;
+  });
+}
+
+function segmentHitsBox(ax, az, bx, bz, b) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dz = bz - az;
+  const tests = [[-dx, ax - b.minX], [dx, b.maxX - ax], [-dz, az - b.minZ], [dz, b.maxZ - az]];
+  for (let i = 0; i < 4; i++) {
+    const pp = tests[i][0], q = tests[i][1];
+    if (pp === 0) { if (q < 0) return false; continue; }
+    const r = q / pp;
+    if (pp < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+    else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return true;
 }
 
 export function update(dt, t, reduceMotion) {
@@ -562,7 +635,10 @@ export function update(dt, t, reduceMotion) {
   fire.glow.material.opacity = 0.55 * flick;
   flickers.forEach(function (f) {
     const k = reduceMotion ? 1 : 0.9 + 0.06 * Math.sin(t * 11 + f.phase) + 0.04 * Math.sin(t * 27 + f.phase);
-    if (f.light) f.light.intensity = f.base * k;
+    // Upstairs lights go dark while upstairs is hidden (intensity, not
+    // visibility, so the shaders don't recompile on every floor change).
+    const on = f.level === 1 && !upperShown ? 0 : 1;
+    if (f.light) f.light.intensity = f.base * k * on;
     if (f.sprite) f.sprite.scale.setScalar(f.base * k);
   });
   const ep = fire.embers.geometry.attributes.position.array;

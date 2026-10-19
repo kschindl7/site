@@ -448,7 +448,8 @@ export function layoutBubbles(camera, w, h) {
     }
     v.set(n.x, n.headY + 0.25, n.z).project(camera);
     const dist = camera.position.distanceTo(n.root.position);
-    const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && dist < 18;
+    // Everyone is downstairs, so their chatter hides while the visitor is up.
+    const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && dist < 18 && !hooks.player().level;
     n.bubble.style.visibility = visible ? 'visible' : 'hidden';
     const bw = n.bubble.offsetWidth;
     const x = Math.max(bw / 2 + 6, Math.min(w - bw / 2 - 6, (v.x + 1) / 2 * w));

@@ -1,25 +1,35 @@
 /*
- * Floor-plan navigation: a coarse grid built from the room's colliders, A*
- * pathfinding across it, and circle-vs-box collision for free movement.
+ * Floor-plan navigation: a coarse grid per floor built from that floor's
+ * colliders, A* pathfinding across it, and circle-vs-box collision for free
+ * movement. The stairs are open on both floors' grids, so a path can climb.
  */
 import { ROOM } from './world.js';
 
 const CELL = 0.5;
+const cols = Math.round((ROOM.maxX - ROOM.minX) / CELL);
+const rows = Math.round((ROOM.maxZ - ROOM.minZ) / CELL);
+const floors = [];
+// The floor being searched or resolved right now.
 let grid = null;
-let cols = 0, rows = 0;
 let boxes = [];
 
-export function init(colliders, radius) {
-  boxes = colliders;
-  cols = Math.round((ROOM.maxX - ROOM.minX) / CELL);
-  rows = Math.round((ROOM.maxZ - ROOM.minZ) / CELL);
-  grid = new Uint8Array(cols * rows);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = ROOM.minX + (c + 0.5) * CELL, z = ROOM.minZ + (r + 0.5) * CELL;
-      grid[r * cols + c] = blocked(x, z, radius) ? 1 : 0;
+export function init(collidersByFloor, radius) {
+  collidersByFloor.forEach(function (list, f) {
+    boxes = list;
+    const g = new Uint8Array(cols * rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = ROOM.minX + (c + 0.5) * CELL, z = ROOM.minZ + (r + 0.5) * CELL;
+        g[r * cols + c] = blocked(x, z, radius) ? 1 : 0;
+      }
     }
-  }
+    floors[f] = { grid: g, boxes: list };
+  });
+}
+
+function use(level) {
+  grid = floors[level || 0].grid;
+  boxes = floors[level || 0].boxes;
 }
 
 function blocked(x, z, radius) {
@@ -55,7 +65,8 @@ function nearestOpen(c, r) {
 }
 
 // A* over the grid with diagonal moves. Returns a list of {x, z} waypoints.
-export function findPath(ax, az, bx, bz) {
+export function findPath(ax, az, bx, bz, level) {
+  use(level);
   const s = nearestOpen.apply(null, cellOf(ax, az));
   const g = nearestOpen.apply(null, cellOf(bx, bz));
   if (!s || !g) return null;
@@ -124,7 +135,8 @@ function clear(a, b) {
 }
 
 // Pushes a circle out of the room's furniture and walls.
-export function resolve(p, radius) {
+export function resolve(p, radius, level) {
+  use(level);
   for (let pass = 0; pass < 2; pass++) {
     for (let i = 0; i < boxes.length; i++) {
       const b = boxes[i];

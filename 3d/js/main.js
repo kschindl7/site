@@ -21,7 +21,9 @@ const LOOK_LINES = {
 const FLAVOR = {
   window: 'Rain lashes the glass. Somewhere out there is a road. In here, there is a fire.',
   door: 'It\'s pouring out there. Best stay by the fire a while.',
-  barrel: 'Dwarven stout, by the smell of it. The good stuff.'
+  barrel: 'Dwarven stout, by the smell of it. The good stuff.',
+  canopy: 'The finest room in the inn. A canopy bed hung with red velvet, kept ready for honored guests.',
+  bed: 'A narrow bed under a patched quilt. Simple, but it beats sleeping in the rain.'
 };
 
 const canvas = $('scene');
@@ -85,7 +87,7 @@ fetch('../index.html').then(function (r) { return r.text(); }).then(function (ht
 }).catch(function () { contentDoc = null; });
 
 const world = { colliders: [], hotspots: [] };
-const player = { x: 3.2, z: 5.0, rot: Math.PI, speed: 4.2, radius: 0.4, path: [], target: null, rig: null, shadow: null };
+const player = { x: 3.2, y: 0, z: 5.0, level: 0, rot: Math.PI, speed: 4.2, radius: 0.4, path: [], target: null, rig: null, shadow: null };
 const portrait = window.innerWidth < window.innerHeight;
 // Phones start further back and higher so more of the room fits.
 const cam = { yaw: 0.35, pitch: portrait ? 0.8 : 0.62, dist: portrait ? 11 : 9, x: 3.2, y: 1.6, z: 5.0 };
@@ -139,8 +141,9 @@ function turnToward(o, target, dt, rate) {
 // Every NPC and hotspot the player can use, as {kind, x, z, radius, ...}.
 function targets() {
   const out = [];
-  Cast.list.forEach(function (n) { out.push(npcTarget(n)); });
-  world.hotspots.forEach(function (h) { out.push(h); });
+  // Everyone in the inn drinks downstairs; upstairs there are only rooms.
+  if (player.level === 0) Cast.list.forEach(function (n) { out.push(npcTarget(n)); });
+  world.hotspots.forEach(function (h) { if (h.level === player.level) out.push(h); });
   return out;
 }
 
@@ -451,7 +454,7 @@ function tap(cx, cy) {
   ndc.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   const hits = ray.intersectObjects(scene.children, true).filter(function (h) {
-    return h.object.isMesh && h.object.visible && !(h.object.material && h.object.material.blending === THREE.AdditiveBlending);
+    return h.object.isMesh && shown(h.object) && !(h.object.material && h.object.material.blending === THREE.AdditiveBlending);
   });
   if (!hits.length) return;
   const hit = hits[0];
@@ -459,12 +462,13 @@ function tap(cx, cy) {
   // An NPC?
   let o = hit.object;
   while (o && !o.userData.npc) o = o.parent;
-  if (o) {
+  if (o && player.level === 0) {
     target = npcTarget(Cast.byId[o.userData.npc]);
   } else {
     // Something near a hotspot (the quest board, the fire, a window)?
     let best = null, bestD = Infinity;
     world.hotspots.forEach(function (h) {
+      if (h.level !== player.level) return;
       const d = Math.hypot(h.x - hit.point.x, h.z - hit.point.z) - h.radius;
       if (d < 0.5 && d < bestD) { bestD = d; best = h; }
     });
@@ -472,11 +476,17 @@ function tap(cx, cy) {
   }
   const goal = target ? { x: target.x, z: target.z } : { x: hit.point.x, z: hit.point.z };
   if (target && gap(target) < 1.2) { interact(target); return; }
-  const path = Nav.findPath(player.x, player.z, goal.x, goal.z);
+  const path = Nav.findPath(player.x, player.z, goal.x, goal.z, player.level);
   if (!path) return;
   player.path = path;
   player.target = target;
   showTapMark(path.length ? path[path.length - 1] : goal);
+}
+
+// Raycasts see hidden objects too, so check every parent.
+function shown(o) {
+  for (; o; o = o.parent) if (!o.visible) return false;
+  return true;
 }
 
 function showTapMark(p) {
@@ -485,7 +495,7 @@ function showTapMark(p) {
     tapMark.rotation.x = -Math.PI / 2;
     scene.add(tapMark);
   }
-  tapMark.position.set(p.x, 0.06, p.z);
+  tapMark.position.set(p.x, World.heightAt(p.x, p.z, player.level).y + 0.06, p.z);
   tapMark.userData.born = clock;
   tapMark.visible = true;
 }
@@ -522,8 +532,8 @@ function updatePlayer(dt) {
     const step = player.speed * dt;
     const before = { x: player.x, z: player.z };
     const p = { x: player.x + move.x * step, z: player.z + move.y * step };
-    Nav.resolve(p, player.radius);
-    pushFromPeople(p);
+    Nav.resolve(p, player.radius, player.level);
+    if (player.level === 0) pushFromPeople(p);
     player.x = p.x;
     player.z = p.z;
     moving = Math.hypot(p.x - before.x, p.z - before.z) > step * 0.2;
@@ -533,9 +543,16 @@ function updatePlayer(dt) {
   if (!player.path.length && !player.target && tapMark) tapMark.visible = false;
   player.rig.play(moving ? 'run' : 'idle', { fade: 0.18 });
   player.rig.mixer.update(dt);
-  player.rig.root.position.set(player.x, 0, player.z);
+  // Climb the stairs, and show the upstairs only once the player is up there.
+  const ground = World.heightAt(player.x, player.z, player.level);
+  player.y = ground.y;
+  if (ground.level !== player.level) {
+    player.level = ground.level;
+    World.showUpper(player.level === 1);
+  }
+  player.rig.root.position.set(player.x, player.y, player.z);
   player.rig.root.rotation.y = player.rot;
-  player.shadow.position.set(player.x, 0.03, player.z);
+  player.shadow.position.set(player.x, player.y + 0.03, player.z);
 }
 
 // Standing characters and the cat aren't in the collider list, so keep the
@@ -557,7 +574,8 @@ function updateCamera(dt) {
   const k = 1 - Math.exp(-dt * 8);
   cam.x += (player.x - cam.x) * k;
   cam.z += (player.z - cam.z) * k;
-  const look = new THREE.Vector3(cam.x, 1.5, cam.z);
+  cam.y += (player.y + 1.5 - cam.y) * k;
+  const look = new THREE.Vector3(cam.x, cam.y, cam.z);
   const h = Math.cos(cam.pitch) * cam.dist;
   const cx = look.x + Math.sin(cam.yaw) * h;
   const cz = look.z + Math.cos(cam.yaw) * h;
@@ -565,6 +583,7 @@ function updateCamera(dt) {
   camera.position.set(cx, cy, cz);
   // The wall between the camera and the player drops away, dollhouse style.
   World.cutaway(camera.position);
+  World.fadeBetween(camera.position, player);
   camera.lookAt(look);
 }
 
@@ -575,7 +594,7 @@ function updatePrompt() {
   if (!t || isTouch) { promptEl.classList.remove('show'); return; }
   promptEl.textContent = (isTouch ? '' : 'E  ') + labelFor(t);
   if (t.kind === 'npc') promptPos.set(t.npc.x, t.npc.headY + 0.5, t.npc.z);
-  else promptPos.set(t.x, 2.6, t.z);
+  else promptPos.set(t.x, player.y + 2.6, t.z);
   promptPos.project(camera);
   promptEl.style.left = ((promptPos.x + 1) / 2 * window.innerWidth) + 'px';
   promptEl.style.top = ((1 - promptPos.y) / 2 * window.innerHeight) + 'px';
