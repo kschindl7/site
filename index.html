@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kyle | The Wayward Lantern</title>
+  <meta name="description" content="Kyle's personal site, set in a pixel-art fantasy tavern. Walk around the inn to learn about Kyle, his work, and his interests.">
+  <meta name="theme-color" content="#0b0d1f">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+  <a class="skip-link" href="?view=page">Skip the game and read everything as a page</a>
+
+  <div id="game">
+    <div id="hud">
+      <button id="menu-btn" class="ff-btn" type="button" aria-haspopup="dialog">Menu</button>
+      <button id="sound-btn" class="ff-btn" type="button" aria-pressed="false" aria-label="Turn sound on">
+        <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" shape-rendering="crispEdges">
+          <path fill="currentColor" d="M2 6h3l4-3h1v10H9L5 10H2z"/>
+          <g class="sound-waves" fill="currentColor"><rect x="11" y="6" width="1" height="4"/><rect x="13" y="4" width="1" height="8"/></g>
+          <g class="sound-x" fill="currentColor"><rect x="11" y="5" width="1" height="1"/><rect x="12" y="6" width="1" height="1"/><rect x="13" y="7" width="1" height="2"/><rect x="12" y="9" width="1" height="1"/><rect x="11" y="10" width="1" height="1"/><rect x="14" y="6" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="14" y="9" width="1" height="1"/><rect x="15" y="10" width="1" height="1"/></g>
+        </svg>
+        <span class="sound-label">Sound off</span>
+      </button>
+    </div>
+
+    <div id="stage">
+      <canvas id="screen" width="320" height="240" role="img" aria-label="A pixel-art tavern at night, with rain on the windows. Use the Menu button to browse every section without playing."></canvas>
+      <div id="overlay-layer" aria-hidden="true"></div>
+      <div id="prompt" aria-hidden="true"></div>
+      <div id="title-card" aria-hidden="true">
+        <div class="title-name">The Wayward Lantern</div>
+        <div class="title-sub">An inn of stories, kept by Kyle</div>
+      </div>
+      <div id="dialog" class="ff-window" hidden>
+        <div id="dialog-name"></div>
+        <p id="dialog-text"></p>
+        <span id="dialog-next" aria-hidden="true">&#9660;</span>
+      </div>
+    </div>
+
+    <p id="sr-live" class="sr-only" aria-live="polite"></p>
+    <p id="hint"><span class="hint-keys">Move with arrow keys or WASD. Press Space to talk or look.</span><span class="hint-touch">Tap a spot to walk there. Tap a person or object to talk or look.</span></p>
+  </div>
+
+  <div id="menu" class="ff-window modal" role="dialog" aria-modal="true" aria-labelledby="menu-title" hidden>
+    <h2 id="menu-title">Menu</h2>
+    <ul class="menu-list">
+      <li><button type="button" data-section="about">About me</button></li>
+      <li><button type="button" data-section="work">Work experience</button></li>
+      <li><button type="button" data-section="interests">Interests</button></li>
+      <li><button type="button" data-section="other">Other</button></li>
+    </ul>
+    <p class="menu-foot"><a href="?view=page">Read everything as one page</a></p>
+    <button type="button" class="close-btn" data-close>Back to the inn</button>
+  </div>
+
+  <div id="panel" class="ff-window modal" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden>
+    <h2 id="panel-title" tabindex="-1"></h2>
+    <div id="panel-body"></div>
+    <button type="button" class="close-btn" data-close>Back to the inn</button>
+  </div>
+
+  <!--
+    All site content lives here. The game reads each <section> by its
+    data-section name, and this same markup is the plain-page and no-JavaScript
+    version of the site. Edit text here; nothing else needs to change.
+  -->
+  <main id="content">
+    <header class="page-header">
+      <h1>Kyle</h1>
+      <p class="tagline">[One-line tagline: what you do, in plain words.]</p>
+      <p class="back-to-inn"><a href="./">Enter the inn (the playable version)</a></p>
+    </header>
+
+    <section data-section="about" id="about">
+      <h2>About me</h2>
+      <p>[A short intro, three or four sentences: who you are, what you do, and what you care about.]</p>
+      <ul>
+        <li><strong>Based in:</strong> [City, State]</li>
+        <li><strong>Currently:</strong> [Role] at [Company]</li>
+        <li><strong>Reach me:</strong> [Email or LinkedIn link]</li>
+      </ul>
+    </section>
+
+    <section data-section="work" id="work">
+      <h2>Work experience</h2>
+      <article class="job">
+        <h3>[Job title], [Company]</h3>
+        <p class="dates">[mm/yy] to present</p>
+        <ul>
+          <li>[What you owned, and the result, with a number if you have one.]</li>
+          <li>[A second accomplishment.]</li>
+        </ul>
+      </article>
+      <article class="job">
+        <h3>[Job title], [Company]</h3>
+        <p class="dates">[mm/yy] to [mm/yy]</p>
+        <ul>
+          <li>[What you owned, and the result.]</li>
+          <li>[A second accomplishment.]</li>
+        </ul>
+      </article>
+      <article class="job">
+        <h3>[Job title], [Company]</h3>
+        <p class="dates">[mm/yy] to [mm/yy]</p>
+        <ul>
+          <li>[What you owned, and the result.]</li>
+        </ul>
+      </article>
+    </section>
+
+    <section data-section="interests" id="interests">
+      <h2>Interests</h2>
+      <ul>
+        <li><strong>[Interest one]:</strong> [Why you love it, in a sentence.]</li>
+        <li><strong>[Interest two]:</strong> [Why you love it, in a sentence.]</li>
+        <li><strong>[Interest three]:</strong> [Why you love it, in a sentence.]</li>
+      </ul>
+    </section>
+
+    <section data-section="other" id="other">
+      <h2>Other</h2>
+      <p>[Projects, writing, talks, side quests, or anything that doesn't fit elsewhere.]</p>
+    </section>
+  </main>
+
+  <script src="js/sprites.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/npcs.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
