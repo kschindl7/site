@@ -101,21 +101,22 @@
 
   // ---------- Rain ----------
   function startRain() {
-    // Hiss through the windows.
+    // Rain heard from indoors: walls and glass cut the highs, so it's a
+    // soft wash rather than a hiss.
     const hiss = noise();
-    const hp = filter('highpass', 600);
-    const lp = filter('lowpass', 5000);
-    const g = gain(0.045);
+    const hp = filter('highpass', 200);
+    const lp = filter('lowpass', 900);
+    const g = gain(0.018);
     hiss.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master);
     // Low drumming on the roof.
     const roof = noise();
-    const rlp = filter('lowpass', 260);
-    const rg = gain(0.09);
+    const rlp = filter('lowpass', 180);
+    const rg = gain(0.05);
     roof.connect(rlp); rlp.connect(rg); rg.connect(master);
     // Slow gusts.
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.08;
-    const depth = gain(0.02);
+    const depth = gain(0.006);
     lfo.connect(depth); depth.connect(g.gain);
     hiss.start(0, rand() * 3);
     roof.start(0, rand() * 3);
@@ -124,13 +125,13 @@
 
   function patter(t) {
     const s = noise(false);
-    const bp = filter('bandpass', between(2500, 6000), 2);
+    const bp = filter('bandpass', between(700, 1600), 2);
     const g = gain(0);
     const p = panner(pick([-0.6, 0.15, 0.85]) + between(-0.1, 0.1));
     s.connect(bp); bp.connect(g); g.connect(p); p.connect(master);
-    const a = between(0.01, 0.035);
+    const a = between(0.003, 0.009);
     g.gain.setValueAtTime(a, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
     s.start(t, rand() * 3);
     s.stop(t + 0.03);
   }
@@ -370,11 +371,11 @@
     const lp = filter('lowpass', 500);
     const g = gain(0);
     s.connect(lp); lp.connect(g); g.connect(master);
-    lp.frequency.setValueAtTime(700, t);
-    lp.frequency.exponentialRampToValueAtTime(70, t + 4);
+    lp.frequency.setValueAtTime(400, t);
+    lp.frequency.exponentialRampToValueAtTime(60, t + 4);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.55, t + 0.25);
-    g.gain.setTargetAtTime(0.25, t + 0.6, 0.4);
+    g.gain.linearRampToValueAtTime(0.4, t + 0.25);
+    g.gain.setTargetAtTime(0.18, t + 0.6, 0.4);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 4.8);
     s.start(t, rand() * 3);
     s.stop(t + 5);
@@ -443,7 +444,7 @@
     }
     while (next.patter < horizon) {
       patter(Math.max(now, next.patter));
-      next.patter += between(0.03, 0.14);
+      next.patter += between(0.06, 0.25);
     }
     if (now > next.clink) { clink(); next.clink = now + between(2.5, 7); }
     if (now > next.laugh) { laugh(undefined, rand() < 0.3); next.laugh = now + between(5, 14); }
