@@ -8,6 +8,9 @@
  * bard's lute.
  */
 (function () {
+  // A page can leave out the rain with <script src="audio.js" data-rain="off">.
+  const script = document.currentScript;
+  const withRain = !(script && script.dataset.rain === 'off');
   'use strict';
 
   const Sound = { on: false };
@@ -85,7 +88,7 @@
     room.connect(master);
     room.connect(reverb);
 
-    startRain();
+    if (withRain) startRain();
     startFire();
     startCrowd();
     const now = ctx.currentTime;
@@ -442,7 +445,7 @@
       crackle(Math.max(now, next.crackle));
       next.crackle += between(0.03, 0.35);
     }
-    while (next.patter < horizon) {
+    while (withRain && next.patter < horizon) {
       patter(Math.max(now, next.patter));
       next.patter += between(0.06, 0.25);
     }

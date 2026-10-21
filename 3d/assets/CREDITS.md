@@ -13,7 +13,7 @@ attribution required). Thanks, Kay: [kaylousberg.com](https://www.kaylousberg.co
 The character files were trimmed to the animations the tavern uses (idle, walk,
 run, sit, cheer, interact, use item) to cut each file from about 3.6 MB to 0.6 MB.
 
-The fireplace, bar counter, quest board, lanterns, lute, cat, rain, and all
+The fireplace, bar counter, quest board, lanterns, lute, cat, and all
 sound are made in code.
 
 ## Swapping in different art
