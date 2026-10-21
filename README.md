@@ -44,3 +44,4 @@ It lives at `/3d/` and leaves the pixel-art version untouched.
 - Models are free CC0 KayKit packs. See `3d/assets/CREDITS.md`, and `3d/js/manifest.js` for swapping in other art.
 - Stairs along the north wall lead to a second floor with a hallway, two small bedrooms, and a large bedroom with a canopy bed. The upstairs only shows while you're on it.
 - `3d/js/world.js`: taproom, fireplace, quest board, lighting, rain. `3d/js/upstairs.js`: stairs and bedrooms. `3d/js/cast.js`: characters and banter. `3d/js/main.js`: camera, controls, dialog, menus.
+- Performance: `3d/js/quality.js` renders at 1x with an FXAA pass and steps the resolution down on slow devices. Add `?pr=1.5` (or any ratio) to the URL to pin a pixel ratio for testing. The scene uses only three point lights, which move upstairs with the player, and identical textures are shared after loading.

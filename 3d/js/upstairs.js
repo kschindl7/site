@@ -272,9 +272,8 @@ function buildHallway() {
   light(2.5, U + 2.8, -2.0, 6);
 }
 
+// Upstairs has no lights of its own: the shared lights move to the spots
+// nearest the player while they are up here.
 function light(x, y, z, intensity) {
-  const l = new THREE.PointLight('#ffc585', 0, 11, 1.5);
-  l.position.set(x, y, z);
-  K.upper.add(l);
-  K.flickers.push({ light: l, base: intensity, phase: Math.random() * 10, level: 1 });
+  K.upperSpots.push({ pos: new THREE.Vector3(x, y, z), base: intensity });
 }

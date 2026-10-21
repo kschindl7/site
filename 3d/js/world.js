@@ -277,6 +277,7 @@ function buildFireplace() {
   fire.light = new THREE.PointLight('#ff8a3a', 11, 18, 1.2);
   fire.light.position.set(8.4, 1.3, zc);
   scene.add(fire.light);
+  pool.push(poolEntry(fire.light, 11, true));
 
   // Embers drifting up the chimney.
   const n = 40;
@@ -319,8 +320,11 @@ function buildFireplace() {
 function glowSprite(color, size) {
   const tex = canvasTexture(64, 64, function (g) {
     const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    // Glows blend before tone mapping (see quality.js), so the falloff is
+    // steeper than it looks here to keep the halos tight.
     grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(0.2, 'rgba(255,255,255,0.4)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
     grad.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
@@ -442,11 +446,7 @@ function buildTables() {
   place('tableSmall', -7.2, 6.3, 0);
   blockAt(-7.2, 6.3, 1.0, 1.0, 'table');
   seat('stranger', 'chair', -8.4, 6.3, Math.PI / 2);
-  candleAt(-7.1, 6.5, 1.0);
-  const corner = new THREE.PointLight('#ffb070', 3, 4.5, 1.6);
-  corner.position.set(-7.2, 1.9, 6.4);
-  scene.add(corner);
-  flickers.push({ light: corner, base: 3, phase: 2 });
+  candleAt(-7.1, 6.5, 1.0, 0.7);
 }
 
 // ---------- Rain and lightning ----------
@@ -511,10 +511,53 @@ function updateWeather(dt, t, reduceMotion) {
 }
 
 // ---------- Lights ----------
+// Three point lights serve both floors: downstairs they are the fire and the
+// two lanterns, upstairs they follow the player to the three nearest of the
+// upstairs lamp spots, fading as they move. Point lights are the most
+// expensive part of every pixel, and a fixed count means the shaders compile
+// once instead of on every floor change.
+const pool = [];
+const upperSpots = [];
+let focusX = 0, focusZ = 0;
+let hemi = null;
+function poolEntry(l, base, isFire) {
+  return { light: l, isFire: !!isFire, phase: Math.random() * 10, ground: { pos: l.position.clone(), color: l.color.clone(), distance: l.distance, decay: l.decay, base: base }, spot: null, want: null, fade: 1 };
+}
+function moveTo(p, spot) {
+  const g = p.ground;
+  p.spot = p.want = spot;
+  p.light.position.copy(spot ? spot.pos : g.pos);
+  p.light.color.set(spot ? '#ffc585' : g.color);
+  p.light.distance = spot ? 11 : g.distance;
+  p.light.decay = spot ? 1.5 : g.decay;
+}
+// Picks which upstairs spots the lights should sit at, nearest first.
+function aimPool() {
+  const near = upperSpots.slice().sort(function (a, b) {
+    return Math.hypot(a.pos.x - focusX, a.pos.z - focusZ) - Math.hypot(b.pos.x - focusX, b.pos.z - focusZ);
+  }).slice(0, pool.length);
+  const free = near.filter(function (s) { return !pool.some(function (p) { return p.want === s; }); });
+  pool.forEach(function (p) {
+    if (near.indexOf(p.want) < 0) p.want = free.shift() || null;
+  });
+}
+function usePool(up) {
+  // Downstairs the fire and lanterns also light the upstairs through the
+  // floor, so the sky light makes up the difference up there.
+  if (hemi) hemi.intensity = up ? 1.1 : 0.7;
+  pool.forEach(function (p) { moveTo(p, null); p.fade = 1; });
+  if (!up) return;
+  aimPool();
+  pool.forEach(function (p) { moveTo(p, p.want); });
+}
+// The player's position, so upstairs lights can follow them.
+export function setFocus(x, z) { focusX = x; focusZ = z; }
+
 const lamps = [];
 const lanterns = [];
 function buildLights() {
-  scene.add(new THREE.HemisphereLight('#6a78b8', '#2a1a10', 0.7));
+  hemi = new THREE.HemisphereLight('#6a78b8', '#2a1a10', 0.7);
+  scene.add(hemi);
   const moon = new THREE.DirectionalLight('#7f93d6', 0.35);
   moon.position.set(-12, 10, 3);
   scene.add(moon);
@@ -523,7 +566,7 @@ function buildLights() {
     l.position.set(p[0], p[1], p[2]);
     scene.add(l);
     lamps.push(l);
-    flickers.push({ light: l, base: p[3], phase: Math.random() * 10 });
+    pool.push(poolEntry(l, p[3]));
     // A simple hanging lantern for each light.
     const lantern = new THREE.Group();
     const frameMat = mat('#2a1d14');
@@ -562,17 +605,19 @@ export function build(s) {
   buildUpstairs({
     THREE: THREE, scene: scene, upper: upper, place: place, box: box, mat: mat, dim: dim,
     block: block, blockAt: blockAt, hotspot: hotspot, onWall: onWall, candleAt: candleAt,
-    woodTexture: woodTexture, canvasTexture: canvasTexture, flickers: flickers, fadeWalls: fadeWalls,
+    woodTexture: woodTexture, canvasTexture: canvasTexture, flickers: flickers, fadeWalls: fadeWalls, upperSpots: upperSpots,
     setTarget: function (t) { target = t; }, setFloor: function (f) { floor = f; }, UPPER_Y: UPPER_Y
   });
   target = null;
   floor = 0;
+  usePool(false);
   return { colliders: colliders, hotspots: hotspots, lightning: lightning };
 }
 
 // Shows the upstairs only while the player is up there, so it never hides
 // the ground floor.
 export function showUpper(on) {
+  if (on !== upperShown) usePool(on);
   upperShown = on;
   upper.visible = on;
 }
@@ -631,15 +676,21 @@ export function update(dt, t, reduceMotion) {
     f.position.y = u.base - (1 - k) * u.h * 0.5;
   });
   const flick = reduceMotion ? 1 : 0.88 + 0.08 * Math.sin(t * 9.1) + 0.05 * Math.sin(t * 23.7);
-  fire.light.intensity = 11 * flick;
   fire.glow.material.opacity = 0.55 * flick;
+  if (upperShown) aimPool();
+  pool.forEach(function (p) {
+    // A light leaving for another spot fades out, moves, and fades back in.
+    if (p.want !== p.spot) {
+      p.fade -= dt * 4;
+      if (p.fade <= 0) { p.fade = 0; moveTo(p, p.want); }
+    } else p.fade = Math.min(1, p.fade + dt * 4);
+    const fireNow = p.isFire && !p.spot;
+    const k = fireNow ? flick : reduceMotion ? 1 : 0.9 + 0.06 * Math.sin(t * 11 + p.phase) + 0.04 * Math.sin(t * 27 + p.phase);
+    p.light.intensity = (p.spot ? p.spot.base * 1.4 : p.ground.base) * k * p.fade;
+  });
   flickers.forEach(function (f) {
     const k = reduceMotion ? 1 : 0.9 + 0.06 * Math.sin(t * 11 + f.phase) + 0.04 * Math.sin(t * 27 + f.phase);
-    // Upstairs lights go dark while upstairs is hidden (intensity, not
-    // visibility, so the shaders don't recompile on every floor change).
-    const on = f.level === 1 && !upperShown ? 0 : 1;
-    if (f.light) f.light.intensity = f.base * k * on;
-    if (f.sprite) f.sprite.scale.setScalar(f.base * k);
+    f.sprite.scale.setScalar(f.base * k);
   });
   const ep = fire.embers.geometry.attributes.position.array;
   fire.embers.userData.seeds.forEach(function (s, i) {
