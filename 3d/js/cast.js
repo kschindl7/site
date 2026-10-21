@@ -55,7 +55,7 @@ export const DEFS = [
     lines: ['I\'m told the quest board lists every job Kyle has taken. Quite the list.', 'Shh. I\'m at the good part.']
   },
   {
-    id: 'stranger', name: 'Hooded Stranger', short: 'Stranger', model: 'hooded', tint: '#9a9ab0', seat: 'stranger',
+    id: 'stranger', name: 'Hooded Stranger', short: 'Stranger', model: 'hooded', tint: '#9a9ab0', glow: '#4a3220', seat: 'stranger',
     section: 'other',
     intro: ['...You found me. Few think to look in the corner.', 'I keep the things that fit nowhere else. Look, if you dare.']
   },
@@ -157,7 +157,7 @@ export function init(s, opts) {
       n.headY = 0.7;
       n.radius = 0.5;
     } else {
-      n.rig = character(d.model, { tint: d.tint, show: d.show, hide: d.hide });
+      n.rig = character(d.model, { tint: d.tint, show: d.show, hide: d.hide, glow: d.glow });
       n.root = n.rig.root;
       n.radius = 0.45;
       if (d.seat) {

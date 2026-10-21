@@ -7,6 +7,7 @@ import { loadAll, character } from './assets.js';
 import * as World from './world.js';
 import * as Nav from './nav.js';
 import * as Cast from './cast.js';
+import * as Quality from './quality.js';
 
 const $ = function (id) { return document.getElementById(id); };
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -54,12 +55,11 @@ function fail(msg) {
 
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false, powerPreference: 'high-performance' });
 } catch (e) {
   fail('This browser or device can\'t show the 3D tavern.');
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isTouch ? 1.5 : 1.75));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -68,10 +68,11 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#06070d');
 scene.fog = new THREE.Fog('#06070d', 22, 42);
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 80);
+Quality.init(renderer, scene, camera);
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
-  renderer.setSize(w, h, false);
+  Quality.resize(w, h);
   camera.aspect = w / h;
   // Narrow phone screens get a wider view so the room still fits.
   camera.fov = w < h ? 62 : 50;
@@ -604,20 +605,23 @@ function updatePrompt() {
 // ---------- Loop ----------
 let last = 0;
 function frame(ts) {
-  const dt = Math.min(0.05, (ts - last) / 1000 || 0);
+  const raw = (ts - last) / 1000 || 0;
+  const dt = Math.min(0.05, raw);
   last = ts;
+  Quality.sample(raw);
   clock += dt;
   updatePlayer(dt);
   Cast.update(dt, clock, mode !== 'play' && mode !== 'dialog');
+  World.setFocus(player.x, player.z);
   World.update(dt, clock, reduceMotion);
   updateDialog(dt);
   updateCamera(dt);
   if (tapMark && tapMark.visible) tapMark.material.opacity = 0.6 + Math.sin(clock * 6) * 0.3;
-  renderer.render(scene, camera);
+  Quality.render();
   Cast.layoutBubbles(camera, window.innerWidth, window.innerHeight);
   updatePrompt();
   requestAnimationFrame(frame);
 }
 
 // Lets automated checks drive the scene.
-window.__tavern = { player: player, cam: cam, interact: interact, focusTarget: focusTarget, mode: function () { return mode; } };
+window.__tavern = { renderer: renderer, scene: scene, quality: Quality, player: player, cam: cam, interact: interact, focusTarget: focusTarget, mode: function () { return mode; } };

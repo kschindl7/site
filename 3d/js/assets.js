@@ -21,7 +21,47 @@ export function loadAll(onProgress) {
   Object.keys(CHARACTERS).forEach(function (kind) {
     jobs.push(loader.loadAsync(CHARACTERS[kind].file).then(function (g) { cache['char:' + kind] = g; }));
   });
-  return Promise.all(jobs);
+  return Promise.all(jobs).then(shareTextures);
+}
+
+// Each KayKit file embeds its own copy of the same texture atlas, so dozens of
+// props would each upload an identical 1024px image to the graphics card.
+// Textures whose pixels match are collapsed into one shared copy.
+function shareTextures() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const byKey = new Map();
+  const seen = new Map();
+  function canonical(tex) {
+    if (seen.has(tex)) return seen.get(tex);
+    const img = tex.image;
+    let key = null;
+    try {
+      ctx.clearRect(0, 0, 64, 64);
+      ctx.drawImage(img, 0, 0, 64, 64);
+      const px = ctx.getImageData(0, 0, 64, 64).data;
+      let h = 2166136261;
+      for (let i = 0; i < px.length; i++) h = Math.imul(h ^ px[i], 16777619);
+      key = [img.width, img.height, tex.colorSpace, tex.flipY, tex.wrapS, tex.wrapT, h].join(':');
+    } catch (e) { key = null; }
+    let out = tex;
+    if (key) {
+      if (byKey.has(key)) { out = byKey.get(key); tex.dispose(); } else byKey.set(key, tex);
+    }
+    seen.set(tex, out);
+    return out;
+  }
+  Object.keys(cache).forEach(function (k) {
+    cache[k].scene.traverse(function (o) {
+      if (!o.material) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) {
+        Object.keys(m).forEach(function (p) {
+          if (m[p] && m[p].isTexture) m[p] = canonical(m[p]);
+        });
+      });
+    });
+  });
 }
 
 function prepare(obj) {
@@ -60,6 +100,11 @@ export function character(kind, opts) {
     if (o.isMesh && opts.tint) {
       o.material = o.material.clone();
       o.material.color.multiply(new THREE.Color(opts.tint));
+      // A faint warm self-light stands in for a nearby point light.
+      if (opts.glow) {
+        o.material.emissive.set(opts.glow);
+        o.material.emissiveMap = o.material.map;
+      }
     }
   });
   if (def.scale) model.scale.setScalar(def.scale);
