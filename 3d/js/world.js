@@ -1,6 +1,6 @@
 /*
  * The Wayward Lantern in 3D: the room, its furniture, the fireplace and
- * quest board (built in code), lighting, rain outside, and lightning.
+ * quest board (built in code), lighting, and lightning.
  *
  * Coordinates: x runs west to east, z runs north to south, y is up. One unit
  * is roughly a third of a person's height. The room's inside walls sit at
@@ -158,7 +158,7 @@ function buildShell() {
     place('wallDoor', 4, 8, Math.PI);
     place('bannerShield', -3.2, 7.45, Math.PI, 1.3);
   });
-  // West wall, with two rain windows.
+  // West wall, with two windows.
   onWall('west', function () {
     place('wall', -10, -6, Math.PI / 2);
     place('wallWindow', -10, -2, Math.PI / 2);
@@ -449,55 +449,17 @@ function buildTables() {
   candleAt(-7.1, 6.5, 1.0, 0.7);
 }
 
-// ---------- Rain and lightning ----------
-// Rain stops at the top of the visible walls so a high camera never sees it
-// over the room: the ground walls downstairs, the upstairs walls upstairs.
-const RAIN_TOP = 8.2;
-const RAIN_TOP_GROUND = 4.2;
-const rain = { lines: null, speed: 16, boxes: [] };
+// ---------- Lightning ----------
+// A storm outside, seen as flashes through the windows and heard as thunder.
 const lightning = { next: 8, flashes: [], level: 0, light: null };
 
 function buildWeather() {
-  // Rain falls outside each wall. A side's rain hides along with its wall,
-  // so it never streaks across the camera's view of the room.
-  rain.boxes = [
-    { side: 'west', x0: -16, x1: -10.6, z0: -10, z1: 10 },
-    { side: 'east', x0: 10.6, x1: 16, z0: -10, z1: 10 },
-    { side: 'south', x0: -10, x1: 10, z0: 8.6, z1: 14 },
-    { side: 'north', x0: -10, x1: 10, z0: -14, z1: -8.6 }
-  ];
-  const per = 450;
-  const n = per * rain.boxes.length;
-  const pos = new Float32Array(n * 6);
-  const drops = [];
-  rain.boxes.forEach(function (b) {
-    for (let i = 0; i < per; i++) drops.push({ side: b.side, x: b.x0 + Math.random() * (b.x1 - b.x0), z: b.z0 + Math.random() * (b.z1 - b.z0), y: Math.random() * RAIN_TOP });
-  });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  rain.lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: '#8ea4d8', transparent: true, opacity: 0.45 }));
-  rain.lines.frustumCulled = false;
-  rain.drops = drops;
-  scene.add(rain.lines);
-
   lightning.light = new THREE.DirectionalLight('#b8c8ff', 0);
   lightning.light.position.set(-20, 18, 4);
   scene.add(lightning.light);
 }
 
 function updateWeather(dt, t, reduceMotion) {
-  const pos = rain.lines.geometry.attributes.position.array;
-  rain.drops.forEach(function (d, i) {
-    d.y -= rain.speed * dt;
-    d.x += 2.2 * dt;
-    if (d.y < 0) { d.y += RAIN_TOP; d.x -= RAIN_TOP * 0.14; }
-    const k = i * 6;
-    if (!sides[d.side].visible || (!upperShown && d.y > RAIN_TOP_GROUND)) { pos.fill(-50, k, k + 6); return; }
-    pos[k] = d.x; pos[k + 1] = d.y; pos[k + 2] = d.z;
-    pos[k + 3] = d.x - 0.08; pos[k + 4] = d.y + 0.45; pos[k + 5] = d.z;
-  });
-  rain.lines.geometry.attributes.position.needsUpdate = true;
-
   if (t > lightning.next) {
     lightning.next = t + 14 + Math.random() * 22;
     const n = 1 + Math.floor(Math.random() * 3);

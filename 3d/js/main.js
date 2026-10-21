@@ -20,8 +20,8 @@ const LOOK_LINES = {
   books: ['The shelf is full of well-worn books, their spines cracked from rereading.', 'Each one has a story.']
 };
 const FLAVOR = {
-  window: 'Rain lashes the glass. Somewhere out there is a road. In here, there is a fire.',
-  door: 'It\'s pouring out there. Best stay by the fire a while.',
+  window: 'A storm rumbles over the hills. Somewhere out there is a road. In here, there is a fire.',
+  door: 'It\'s a wild night out there. Best stay by the fire a while.',
   barrel: 'Dwarven stout, by the smell of it. The good stuff.',
   canopy: 'The finest room in the inn. A canopy bed hung with red velvet, kept ready for honored guests.',
   bed: 'A narrow bed under a patched quilt. Simple, but it beats sleeping in the rain.'

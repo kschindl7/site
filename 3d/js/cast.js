@@ -361,7 +361,7 @@ function updatePip(n, dt, t) {
 const SCENES = [
   { lines: [['durgin', 'Another round!'], ['hilda', 'You said that three rounds ago.'], ['durgin', 'And I was right then, too!']], laugh: true },
   { lines: [['brom', 'Elsa! The fireside table is running dry!'], ['elsa', 'Coming, coming!']], after: function () { sendElsa('tableB'); } },
-  { lines: [['pip', '♪ Oh, the rain on the roof and the ale in my cup... ♪'], ['tobias', 'Zzz... five more minutes...']] },
+  { lines: [['pip', '♪ Oh, the wind at the door and the ale in my cup... ♪'], ['tobias', 'Zzz... five more minutes...']] },
   { lines: [['mara', 'Quiet night.'], ['brom', 'Quiet is good. Nobody breaks the chairs.']] },
   { lines: [['fenwick', 'Has anyone actually talked to the stranger?'], ['hilda', 'Not on purpose.']], laugh: true },
   { lines: [['hilda', 'Bet you can\'t finish that in one go.'], ['durgin', 'Watch me.'], ['durgin', '*hic*']], laugh: true },
